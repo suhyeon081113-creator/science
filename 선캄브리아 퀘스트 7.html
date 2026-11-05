@@ -1,0 +1,735 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>선캄브리아 퀘스트</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃: 상단 HUD 띠 → 16:9 게임 화면(카드형 오버레이) → 하단 퀘스트·조작 패널. 깊은 바다 한 가지 분위기로 고정(단일 테마) */
+:root{
+  --abyss:#04141c; --deep:#0b2c3a; --line:#17485a; --foam:#d9f3ee; --muted:#8fb4bd;
+  --cyano:#3fd1b0; --gold:#f2c14e; --rose:#ff7a90; --ice:#cfeaf5;
+  --display:"Do Hyeon","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--abyss); color:var(--foam); font-family:var(--body); font-size:15px; line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:18px 32px;
+}
+.wrap{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:12px}
+.bar{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:10px 24px}
+.eyebrow{font-size:12px; letter-spacing:.16em; color:var(--cyano)}
+h1{font-family:var(--display); font-weight:400; font-size:clamp(26px,5vw,38px); line-height:1.1; margin:2px 0 0; text-wrap:balance}
+.hud{display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; min-width:0}
+.stagechip{font-family:var(--display); font-size:14px; padding:3px 12px; border:1px solid var(--cyano); color:var(--cyano); border-radius:999px; white-space:nowrap}
+.hearts{display:flex; gap:3px}
+.hearts svg{width:18px; height:18px}
+.gauge{display:flex; align-items:center; gap:8px; min-width:170px}
+.gauge span{font-size:13px; color:var(--muted); white-space:nowrap}
+.track{flex:1; height:10px; background:#0f3342; border-radius:6px; overflow:hidden; min-width:90px}
+.track i{display:block; height:100%; width:100%; background:var(--cyano); transition:width .15s, background .2s}
+.stage{position:relative; aspect-ratio:16/9; background:#000; border:1px solid var(--line); overflow:hidden}
+.stage canvas{display:block; width:100%; height:100%; touch-action:none; cursor:crosshair}
+.overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:14px; background:rgba(2,14,20,.74); overflow:auto}
+.card{max-width:560px; width:100%; display:flex; flex-direction:column; gap:10px}
+.card .tag{font-size:12px; letter-spacing:.16em; color:var(--gold)}
+.card h2{font-family:var(--display); font-weight:400; font-size:clamp(24px,4.4vw,34px); line-height:1.15; margin:0; text-wrap:balance}
+.card p{margin:0; color:var(--foam); max-width:62ch}
+.card .fact{color:var(--muted); font-size:14px; border-left:2px solid var(--line); padding-left:12px}
+.card ul{margin:0; padding-left:18px; color:var(--foam)}
+.btn{align-self:flex-start; font-family:var(--display); font-size:18px; letter-spacing:.04em; color:#032018; background:var(--cyano); border:0; padding:9px 22px; border-radius:4px; cursor:pointer}
+.btn:hover{background:#6fe6c9}
+.btn:focus-visible,.fire:focus-visible{outline:2px solid var(--gold); outline-offset:3px}
+.panel{display:grid; grid-template-columns:1.15fr 1fr; gap:14px 28px}
+.panel h3{font-family:var(--display); font-weight:400; font-size:16px; letter-spacing:.08em; color:var(--gold); margin:0 0 6px}
+#questList{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px}
+#questList li{display:flex; gap:9px; align-items:baseline}
+#questList li::before{content:""; flex:none; width:11px; height:11px; border:1.5px solid var(--muted); border-radius:2px; transform:translateY(1px)}
+#questList li.done{color:var(--cyano)}
+#questList li.done::before{background:var(--cyano); border-color:var(--cyano)}
+.keys{display:flex; flex-direction:column; gap:6px; color:var(--muted); font-size:14px}
+kbd{font-family:var(--body); font-size:12px; color:var(--foam); background:var(--deep); border:1px solid var(--line); border-radius:3px; padding:0 6px}
+.fire{align-self:flex-start; font-family:var(--display); font-size:17px; color:var(--abyss); background:var(--gold); border:0; border-radius:4px; padding:9px 20px; cursor:pointer; user-select:none; -webkit-user-select:none; touch-action:manipulation}
+.fire:active{background:#ffd978}
+@media (max-width:640px){
+  .panel{grid-template-columns:1fr}
+  .stage.ovon{aspect-ratio:auto}
+  .stage.ovon canvas{display:none}
+  .stage.ovon .overlay{position:static; background:var(--deep); padding:18px 16px}
+}
+@media (prefers-reduced-motion:reduce){ .track i{transition:none} }
+</style>
+
+<main class="wrap">
+  <header class="bar">
+    <div>
+      <div class="eyebrow">남세균 왕자의 모험</div>
+      <h1>선캄브리아 퀘스트</h1>
+    </div>
+    <div class="hud">
+      <div class="stagechip" id="stageChip">준비</div>
+      <div class="hearts" id="hearts" aria-label="체력"></div>
+      <div class="gauge" id="gaugeWrap"><span id="gaugeLabel">산소</span><div class="track"><i id="gaugeFill"></i></div></div>
+    </div>
+  </header>
+
+  <section class="stage ovon" id="stageBox">
+    <canvas id="cv" width="800" height="450" aria-label="선캄브리아 바다를 헤엄치는 남세균 왕자의 게임 화면"></canvas>
+    <div class="overlay" id="ov"></div>
+  </section>
+
+  <section class="panel">
+    <div>
+      <h3>지금 퀘스트</h3>
+      <ul id="questList"></ul>
+    </div>
+    <div class="keys">
+      <div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 헤엄치기</div>
+      <div><kbd>Space</kbd> 광합성 빛 발사 (누르고 있으면 연사)</div>
+      <div>터치·마우스: 화면을 누른 채 끌면 그쪽으로 헤엄치며 자동으로 빛을 쏩니다</div>
+      <button class="fire" id="fireBtn" type="button">빛 발사</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+'use strict';
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var W=800, H=450;
+function $(id){return document.getElementById(id);}
+function rnd(a,b){return a+Math.random()*(b-a);}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function hit(a,b,pad){return Math.hypot(a.x-b.x,a.y-b.y)<a.r+b.r+(pad||0);}
+var TAU=Math.PI*2;
+
+/* ---------- 입력 ---------- */
+var keys={}, pointer=null, fireHeld=false;
+addEventListener('keydown',function(e){
+  var k=e.key.toLowerCase();
+  if(['arrowup','arrowdown','arrowleft','arrowright',' '].indexOf(k)>=0) e.preventDefault();
+  keys[k]=true;
+});
+addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false;});
+function setPointer(e){
+  var r=cv.getBoundingClientRect();
+  pointer={x:(e.clientX-r.left)/r.width*W, y:(e.clientY-r.top)/r.height*H};
+}
+cv.addEventListener('pointerdown',function(e){setPointer(e); try{cv.setPointerCapture(e.pointerId);}catch(_){}});
+cv.addEventListener('pointermove',function(e){if(pointer) setPointer(e);});
+cv.addEventListener('pointerup',function(){pointer=null;});
+cv.addEventListener('pointercancel',function(){pointer=null;});
+var fb=$('fireBtn');
+fb.addEventListener('pointerdown',function(e){e.preventDefault(); fireHeld=true;});
+['pointerup','pointerleave','pointercancel'].forEach(function(n){fb.addEventListener(n,function(){fireHeld=false;});});
+function firing(){return keys[' ']||keys.z||keys.j||fireHeld||!!pointer;}
+
+/* ---------- 상태 ---------- */
+var G={mode:'title', stage:0, hp:5, gauge:100, score:0, kills:0, clock:0, shake:0};
+var P, bullets, enemies, items, parts, eb, friends, toasts=[], L={};
+function resetWorld(){
+  P={x:130,y:225,vx:0,vy:0,r:12,inv:0,cd:0,xmax:W-24};
+  bullets=[]; enemies=[]; items=[]; parts=[]; eb=[]; friends=[]; toasts=[];
+}
+resetWorld();
+
+function burst(x,y,c,n,sp){
+  for(var i=0;i<(n||10);i++){
+    var a=rnd(0,TAU), s=rnd(.3,1)*(sp||120);
+    parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rnd(.4,.8),max:.8,c:c,r:rnd(1.5,3.5)});
+  }
+}
+function toast(t){toasts.push({t:t,life:2.6});}
+function hurt(n){
+  if(P.inv>0||G.mode!=='play') return;
+  G.hp-=(n||1); P.inv=1.5; G.shake=.3; burst(P.x,P.y,'#ff7a90',14,160);
+  if(G.hp<=0){G.hp=0; gameOver();}
+}
+function starve(dt){
+  L.starve=(L.starve||0)-dt;
+  if(L.starve<=0){L.starve=1.5; hurt(1);}
+}
+function addEnemy(o){
+  var e={type:'sulfur',x:W+30,y:rnd(60,H-60),vx:-90,vy:0,r:16,hp:2,t:0,a:30,f:2,score:10,rot:0};
+  for(var k in o) e[k]=o[k];
+  e.y0=e.y; enemies.push(e); return e;
+}
+function addItem(type,x,y,vx,vy){items.push({type:type,x:x,y:y,vx:vx,vy:vy,r:10,t:rnd(0,6)});}
+
+/* ---------- 그리기 도구 ---------- */
+function pathPoly(pts){cx.beginPath(); cx.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) cx.lineTo(pts[i][0],pts[i][1]); cx.closePath();}
+
+function drawPrince(x,y,t,inv,sc){
+  cx.save(); cx.translate(x,y); cx.scale(sc||1,sc||1);
+  if(inv>0 && Math.floor(inv*14)%2===0) cx.globalAlpha=.4;
+  cx.fillStyle='#e05a74'; cx.beginPath(); cx.moveTo(-6,-8);
+  cx.quadraticCurveTo(-30,-14+Math.sin(t*7)*4,-54,-2+Math.sin(t*7+1)*7);
+  cx.quadraticCurveTo(-30,12+Math.sin(t*7+2)*4,-6,9); cx.closePath(); cx.fill();
+  for(var i=3;i>=0;i--){
+    var ox=i===0?0:-12-(i-1)*11, oy=Math.sin(t*7-i*1.1)*2.4*(i+.3), rx=i?8.5:12, ry=i?8:11.5;
+    cx.fillStyle=i%2?'#2aa88f':'#37c4a6'; cx.strokeStyle='#14705f'; cx.lineWidth=1.5;
+    cx.beginPath(); cx.ellipse(ox,oy,rx,ry,0,0,TAU); cx.fill(); cx.stroke();
+    if(i){cx.fillStyle='rgba(180,255,235,.55)'; cx.beginPath(); cx.arc(ox+1,oy-1,2,0,TAU); cx.fill();}
+  }
+  cx.fillStyle='#fff'; cx.beginPath(); cx.arc(3,-3,3,0,TAU); cx.arc(9,-3,3,0,TAU); cx.fill();
+  cx.fillStyle='#0a2a25'; cx.beginPath(); cx.arc(4,-3,1.5,0,TAU); cx.arc(10,-3,1.5,0,TAU); cx.fill();
+  cx.strokeStyle='#0a2a25'; cx.lineWidth=1.3; cx.beginPath(); cx.arc(7,3,3,.15,Math.PI-.15); cx.stroke();
+  cx.fillStyle='#f2c14e'; cx.strokeStyle='#b8891a'; cx.lineWidth=1;
+  pathPoly([[-4,-9],[-5,-18],[-1,-13],[3,-20],[6,-13],[10,-18],[9,-9]]); cx.fill(); cx.stroke();
+  cx.restore();
+}
+
+function drawPrincess(x,y,t,caged,sc){
+  cx.save(); cx.translate(x,y); cx.scale(sc||1,sc||1);
+  var bob=Math.sin(t*2)*3; cx.translate(0,bob);
+  cx.fillStyle='#f6a6b8'; cx.beginPath(); cx.ellipse(0,6,32,15,0,0,TAU); cx.fill();
+  cx.fillStyle='#ffd3dc'; cx.beginPath(); cx.ellipse(0,13,30,6,0,0,TAU); cx.fill();
+  cx.fillStyle='#ff7a90'; cx.beginPath(); cx.ellipse(-2,-4,24,13,0,Math.PI,TAU); cx.fill();
+  cx.strokeStyle='#c24b66'; cx.lineWidth=1.2;
+  for(var i=-3;i<=3;i++){cx.beginPath(); cx.moveTo(i*7-2,-4); cx.lineTo(i*7-2,-15+Math.abs(i)*2.6); cx.stroke();}
+  cx.fillStyle='#f6a6b8'; cx.beginPath(); cx.ellipse(28,4,9,8,0,0,TAU); cx.fill();
+  cx.fillStyle='#fff'; cx.beginPath(); cx.arc(28,1,3,0,TAU); cx.fill();
+  cx.fillStyle='#3a1020'; cx.beginPath(); cx.arc(29,1,1.5,0,TAU); cx.fill();
+  cx.fillStyle='#f2c14e'; pathPoly([[22,-4],[23,-12],[26,-8],[29,-14],[32,-8],[35,-12],[35,-4]]); cx.fill();
+  if(caged){
+    cx.fillStyle='rgba(255,122,144,.12)'; cx.strokeStyle='rgba(255,170,190,.85)'; cx.lineWidth=2;
+    cx.beginPath(); cx.arc(0,0,50,0,TAU); cx.fill(); cx.stroke();
+    cx.save(); cx.beginPath(); cx.arc(0,0,50,0,TAU); cx.clip(); cx.lineWidth=1.5;
+    for(var b=-40;b<=40;b+=16){cx.beginPath(); cx.moveTo(b,-52); cx.lineTo(b,52); cx.stroke();}
+    cx.restore();
+  }
+  cx.restore();
+}
+
+function drawSulfur(e){
+  cx.save(); cx.translate(e.x,e.y); cx.rotate(Math.sin(e.t*4)*.12);
+  cx.fillStyle='#c9c23a';
+  for(var i=0;i<10;i++){
+    var a=i/10*TAU+e.t*.8, r2=e.r+9+Math.sin(e.t*6+i)*3;
+    cx.beginPath(); cx.moveTo(Math.cos(a-.2)*e.r,Math.sin(a-.2)*e.r); cx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2); cx.lineTo(Math.cos(a+.2)*e.r,Math.sin(a+.2)*e.r); cx.fill();
+  }
+  cx.fillStyle='#8b8618'; cx.beginPath(); cx.arc(0,0,e.r,0,TAU); cx.fill();
+  cx.fillStyle='#a8a22a'; cx.beginPath(); cx.arc(-4,5,4,0,TAU); cx.arc(5,-6,3,0,TAU); cx.fill();
+  cx.fillStyle='#ff4d4d'; cx.beginPath(); cx.arc(-5,-3,3.2,0,TAU); cx.arc(5,-3,3.2,0,TAU); cx.fill();
+  cx.strokeStyle='#2a0a0a'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(-9,-8); cx.lineTo(-2,-5); cx.moveTo(9,-8); cx.lineTo(2,-5); cx.stroke();
+  cx.restore();
+}
+function drawVirus(e){
+  cx.save(); cx.translate(e.x,e.y); cx.rotate(Math.PI/2);
+  cx.strokeStyle='#d6a3ff'; cx.lineWidth=2;
+  for(var i=-2;i<=2;i++){cx.beginPath(); cx.moveTo(0,10); cx.lineTo(i*7,22+Math.sin(e.t*8+i)*2); cx.stroke();}
+  cx.beginPath(); cx.moveTo(0,-2); cx.lineTo(0,12); cx.stroke();
+  cx.fillStyle='#a35fd0'; pathPoly([[0,-17],[13,-9],[13,6],[0,12],[-13,6],[-13,-9]]); cx.fill();
+  cx.fillStyle='#ff5a5a'; cx.beginPath(); cx.arc(-4,-4,2.5,0,TAU); cx.arc(4,-4,2.5,0,TAU); cx.fill();
+  cx.restore();
+}
+function drawUrchin(e){
+  cx.save(); cx.translate(e.x,e.y); cx.rotate(e.t*.5);
+  cx.strokeStyle='#b58bd9'; cx.lineWidth=2.2;
+  for(var i=0;i<14;i++){var a=i/14*TAU; cx.beginPath(); cx.moveTo(Math.cos(a)*e.r*.7,Math.sin(a)*e.r*.7); cx.lineTo(Math.cos(a)*(e.r+10),Math.sin(a)*(e.r+10)); cx.stroke();}
+  cx.fillStyle='#4b2a6b'; cx.beginPath(); cx.arc(0,0,e.r,0,TAU); cx.fill();
+  cx.fillStyle='#ff6a6a'; cx.beginPath(); cx.arc(-5,-2,3,0,TAU); cx.arc(5,-2,3,0,TAU); cx.fill();
+  cx.restore();
+}
+function drawIce(e){
+  cx.save(); cx.translate(e.x,e.y); cx.rotate(e.rot);
+  var s=e.r;
+  cx.fillStyle='#e8f8ff'; cx.strokeStyle='#8fd3f0'; cx.lineWidth=1.5;
+  pathPoly([[0,-s*1.5],[s*.7,0],[0,s*1.5],[-s*.7,0]]); cx.fill(); cx.stroke();
+  cx.fillStyle='rgba(143,211,240,.55)'; pathPoly([[0,-s*1.5],[s*.7,0],[0,0]]); cx.fill();
+  cx.restore();
+}
+function drawFrond(x,by,h,t,col,alpha){
+  if(h<4) return;
+  cx.save(); cx.globalAlpha=alpha==null?1:alpha;
+  var sw=Math.sin(t*1.4)*h*.06;
+  cx.strokeStyle=col; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(x,by); cx.quadraticCurveTo(x+sw*.5,by-h*.3,x+sw,by-h*.45); cx.stroke();
+  var lx=x+sw, ly=by-h*.45, lh=h*.55, lw=h*.2;
+  cx.fillStyle=col; cx.globalAlpha=(alpha==null?1:alpha)*.55;
+  cx.beginPath(); cx.ellipse(lx,ly-lh/2,lw,lh/2,sw*.01,0,TAU); cx.fill();
+  cx.globalAlpha=alpha==null?1:alpha; cx.lineWidth=1.3;
+  for(var i=1;i<=9;i++){
+    var yy=ly-lh*i/10, ww=lw*Math.sin(Math.PI*i/10);
+    cx.beginPath(); cx.moveTo(lx,yy); cx.lineTo(lx-ww,yy-5); cx.moveTo(lx,yy); cx.lineTo(lx+ww,yy-5); cx.stroke();
+  }
+  cx.restore();
+}
+function drawTribra(x,y,r,t){
+  cx.save(); cx.translate(x,y); cx.rotate(t*1.2);
+  cx.fillStyle='#e48b3a'; cx.beginPath(); cx.arc(0,0,r,0,TAU); cx.fill();
+  cx.strokeStyle='#ffd59a'; cx.lineWidth=2.4;
+  for(var i=0;i<3;i++){cx.save(); cx.rotate(i*TAU/3); cx.beginPath(); cx.arc(r*.55,0,r*.55,Math.PI*.9,Math.PI*2.1); cx.stroke(); cx.restore();}
+  cx.fillStyle='#5a2a08'; cx.beginPath(); cx.arc(0,0,r*.18,0,TAU); cx.fill();
+  cx.restore();
+}
+function drawSpriggina(x,y,t,sc){
+  cx.save(); cx.translate(x,y); cx.scale(sc||1,sc||1);
+  for(var i=7;i>=0;i--){
+    var ox=-i*7, oy=Math.sin(t*6-i*.7)*3;
+    cx.fillStyle=i%2?'#c7d96a':'#9fbd3f'; cx.beginPath(); cx.ellipse(ox,oy,4.5,8-i*.4,0,0,TAU); cx.fill();
+  }
+  cx.fillStyle='#e5f08a'; cx.beginPath(); cx.ellipse(6,Math.sin(t*6)*3,8,9,0,-Math.PI/2,Math.PI/2); cx.fill();
+  cx.restore();
+}
+function drawMedusoid(x,y,t,sc){
+  cx.save(); cx.translate(x,y); cx.scale(sc||1,sc||1);
+  var p=Math.sin(t*3)*3;
+  cx.strokeStyle='rgba(190,235,255,.8)'; cx.lineWidth=1.6;
+  for(var i=-3;i<=3;i++){cx.beginPath(); cx.moveTo(i*4,2); cx.quadraticCurveTo(i*5+Math.sin(t*4+i)*4,14,i*4+Math.sin(t*3+i)*5,24); cx.stroke();}
+  cx.fillStyle='rgba(180,225,255,.65)'; cx.beginPath(); cx.ellipse(0,2,17,12+p*.4,0,Math.PI,TAU); cx.fill();
+  cx.strokeStyle='rgba(255,255,255,.7)'; cx.beginPath(); cx.arc(0,2,7,Math.PI,TAU); cx.stroke();
+  cx.restore();
+}
+function drawDickinsonia(x,y,rx,ry,t,col,rib,alpha){
+  cx.save(); cx.translate(x,y); cx.globalAlpha=alpha==null?1:alpha;
+  cx.fillStyle=col; cx.beginPath(); cx.ellipse(0,0,rx,ry,0,0,TAU); cx.fill();
+  cx.save(); cx.beginPath(); cx.ellipse(0,0,rx,ry,0,0,TAU); cx.clip();
+  cx.strokeStyle=rib; cx.lineWidth=2;
+  for(var i=-14;i<=14;i++){
+    var k=i/14*rx*.92+Math.sin(t*2+i*.4)*1.5;
+    cx.beginPath(); cx.moveTo(k,-ry); cx.quadraticCurveTo(k+ry*.2,0,k,ry); cx.stroke();
+  }
+  cx.restore();
+  cx.strokeStyle=rib; cx.lineWidth=2.5; cx.beginPath(); cx.ellipse(0,0,rx,ry,0,0,TAU); cx.stroke();
+  cx.restore();
+}
+function drawHeart(i){return '<svg viewBox="0 0 20 20"><path d="M10 18 C2 12 1 7 4 4.5 C6.5 2.5 9 4 10 6 C11 4 13.5 2.5 16 4.5 C19 7 18 12 10 18Z" fill="'+(i?'#ff7a90':'#16394a')+'"/></svg>';}
+
+/* ---------- 배경 도구 ---------- */
+function grad(c0,c1){var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0,c0); g.addColorStop(1,c1); cx.fillStyle=g; cx.fillRect(0,0,W,H);}
+function mod(v,m){return ((v%m)+m)%m;}
+var MS=[]; for(var mi=0;mi<70;mi++) MS.push({x:rnd(0,W),y:rnd(0,H),s:rnd(8,30),r:rnd(1,2.4)});
+function marineSnow(col,fall){
+  cx.fillStyle=col;
+  for(var i=0;i<MS.length;i++){var m=MS[i]; cx.beginPath(); cx.arc(mod(m.x-G.clock*m.s*.8,W),mod(m.y+G.clock*m.s*(fall||.3),H),m.r,0,TAU); cx.fill();}
+}
+function shafts(a){
+  cx.fillStyle='rgba(255,255,225,'+a+')';
+  for(var i=0;i<5;i++){var x0=40+i*170+Math.sin(G.clock*.4+i)*28; pathPoly([[x0,0],[x0+55,0],[x0+170,H],[x0+80,H]]); cx.fill();}
+}
+function vignette(level){
+  if(level<=0) return;
+  var g=cx.createRadialGradient(W/2,H/2,H*.3,W/2,H/2,H*.95);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,10,20,'+(level*.75)+')');
+  cx.fillStyle=g; cx.fillRect(0,0,W,H);
+}
+function branch(x,y,len,ang,d,seed,t){
+  var sw=Math.sin(t*1.2+seed)*.06, x2=x+Math.cos(ang+sw)*len, y2=y+Math.sin(ang+sw)*len;
+  cx.lineWidth=d*1.5+1; cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x2,y2); cx.stroke();
+  if(d>0){branch(x2,y2,len*.72,ang-.5,d-1,seed*1.3,t); branch(x2,y2,len*.72,ang+.5,d-1,seed*1.7,t);}
+}
+var corals=[[],[]], CCOL=['#e0577a','#f08a4b','#a560d8','#ff9ac1','#e9c46a'];
+for(var ci=0;ci<9;ci++) corals[0].push({x:ci*180+rnd(0,80),h:rnd(70,120),c:CCOL[ci%5],k:ci%3,s:rnd(0,9)});
+for(ci=0;ci<7;ci++) corals[1].push({x:ci*235+rnd(0,90),h:rnd(90,150),c:CCOL[(ci+2)%5],k:(ci+1)%3,s:rnd(0,9)});
+function drawCoral(c,x,by,al){
+  cx.save(); cx.globalAlpha=al; cx.strokeStyle=c.c; cx.fillStyle=c.c; cx.lineCap='round';
+  if(c.k===0){branch(x,by,c.h*.34,-Math.PI/2,4,c.s,G.clock);}
+  else if(c.k===1){
+    cx.lineWidth=1.6;
+    for(var i=-6;i<=6;i++){cx.beginPath(); cx.moveTo(x,by); cx.lineTo(x+i*c.h*.09+Math.sin(G.clock+i)*2,by-c.h+Math.abs(i)*5); cx.stroke();}
+    cx.globalAlpha=al*.35; cx.beginPath(); cx.moveTo(x,by); cx.lineTo(x-c.h*.54,by-c.h+30); cx.lineTo(x+c.h*.54,by-c.h+30); cx.closePath(); cx.fill();
+  } else {
+    var r=c.h*.5; cx.beginPath(); cx.arc(x,by,r,Math.PI,TAU); cx.fill();
+    cx.globalAlpha=al*.6; cx.strokeStyle='rgba(60,10,40,.6)'; cx.lineWidth=1.5;
+    for(var j=1;j<5;j++){cx.beginPath(); cx.arc(x,by,r*j/5,Math.PI*1.05,Math.PI*1.95); cx.stroke();}
+  }
+  cx.restore();
+}
+function drawCorals(scroll){
+  for(var l=0;l<2;l++){
+    var sp=l?.6:.3, tot=l?1645:1620;
+    for(var i=0;i<corals[l].length;i++){var c=corals[l][i]; drawCoral(c,mod(c.x-scroll*sp,tot)-90,H-(l?10:30),l?.85:.45);}
+  }
+}
+var ICE=[]; for(var ii=0;ii<=16;ii++) ICE.push(ii%2?rnd(50,95):rnd(14,40));
+
+/* ---------- 스테이지 정의 ---------- */
+var S=[];
+
+S.push({
+  name:'산소가 없는 바다', era:'약 27억 년 전 · 시생누대', gaugeLabel:'산소',
+  story:'바다는 철분 섞인 붉은 물로 가득하고 숨 쉴 산소가 거의 없습니다. 빛줄기를 따라 올라오는 산소 방울을 모으고, 황세균 괴물과 파지를 광합성 빛으로 물리치세요.',
+  fact:'남세균은 약 27억~24억 년 전부터 광합성으로 산소를 만들었습니다. 이 산소가 바닷속 철과 결합해 줄무늬 철광층을 남겼습니다.',
+  init:function(){L={bub:0,spE:1,spB:.3}; G.gauge=75; G.kills=0;},
+  update:function(dt){
+    G.gauge=Math.max(0,G.gauge-3.2*dt); if(G.gauge<=0) starve(dt);
+    L.spE-=dt; if(L.spE<=0){L.spE=rnd(1.2,2);
+      if(Math.random()<.3) addEnemy({type:'virus',vx:-rnd(130,170),r:13,hp:1,score:15});
+      else addEnemy({type:'sulfur',vx:-rnd(70,110),a:rnd(20,50),f:rnd(1.5,3)});}
+    L.spB-=dt; if(L.spB<=0){L.spB=rnd(1.2,1.9); addItem('o2',rnd(90,W-50),H+10,rnd(-12,12),-rnd(45,70));}
+  },
+  bg:function(){
+    grad('#27402e','#4a2a1c'); shafts(.07);
+    for(var i=0;i<6;i++){cx.fillStyle=i%2?'#7a3524':'#4a2f2a'; cx.beginPath(); cx.moveTo(0,H-14-i*9);
+      for(var x=0;x<=W;x+=40) cx.lineTo(x,H-14-i*9+Math.sin(x*.02+i)*3); cx.lineTo(W,H); cx.lineTo(0,H); cx.fill();}
+    marineSnow('rgba(220,200,150,.35)',.25);
+    var low=G.mode==='play'?clamp((35-G.gauge)/35,0,1):0; vignette(.25+low*.6);
+  },
+  quests:function(){return [{t:'산소 방울 모으기 '+Math.min(L.bub||0,8)+'/8',d:(L.bub||0)>=8},{t:'괴물 처치하기 '+Math.min(G.kills,5)+'/5',d:G.kills>=5}];},
+  done:function(){return L.bub>=8&&G.kills>=5;}
+});
+
+S.push({
+  name:'스트로마톨라이트의 층', era:'약 25억 년 전 · 원생누대', gaugeLabel:'산소',
+  story:'얕은 바다 바닥에서 남세균 군집이 끈적한 막으로 퇴적물을 붙잡고 있습니다. 떨어지는 알갱이를 모아 가운데 돌무더기에 닿으면 층이 한 겹씩 쌓입니다. 10층을 쌓아 빛의 문을 여세요.',
+  fact:'스트로마톨라이트는 남세균 매트가 퇴적물을 붙잡아 얇은 층이 겹겹이 쌓인 구조입니다. 가장 오래된 것은 약 35억 년 전의 화석입니다.',
+  init:function(){L={layers:0,carry:0,grow:0,spG:.4,spE:3}; G.gauge=80; G.kills=0;},
+  update:function(dt){
+    G.gauge=Math.max(0,G.gauge-1.8*dt); if(G.gauge<=0) starve(dt);
+    L.grow=Math.max(0,L.grow-dt*1.6);
+    L.spG-=dt; if(L.spG<=0){L.spG=rnd(.7,1.2); addItem('grain',rnd(50,W-50),-10,rnd(-14,14),rnd(55,85));}
+    L.spE-=dt; if(L.spE<=0){L.spE=rnd(2.6,3.8);
+      if(Math.random()<.35) addEnemy({type:'virus',vx:-150,r:13,hp:1,score:15});
+      else addEnemy({type:'sulfur',vx:-rnd(70,100),a:rnd(20,50),f:rnd(1.5,3)});}
+    var topY=H-62-L.layers*12;
+    if(L.carry>0&&L.layers<10&&Math.abs(P.x-400)<110&&P.y>topY-75){
+      var n=L.carry; L.layers=Math.min(10,L.layers+n); G.gauge=Math.min(100,G.gauge+6*n); L.carry=0; L.grow=1;
+      for(var k=0;k<n;k++) addItem('o2',400+rnd(-45,45),topY,rnd(-10,10),-60);
+      burst(400,topY,'#e8d59a',16,140); toast('층이 '+n+'겹 쌓였다!');
+    }
+  },
+  bg:function(){
+    grad('#127a84','#0b3f55'); shafts(.09);
+    for(var i=0;i<5;i++){var x=mod(i*210+60,W+120)-60; cx.fillStyle='rgba(20,90,100,.5)'; cx.beginPath(); cx.ellipse(x,H-30,50,30,0,Math.PI,TAU); cx.fill();}
+    cx.fillStyle='#c7b07a'; cx.fillRect(0,H-34,W,34); cx.fillStyle='#b39a63'; cx.fillRect(0,H-34,W,4);
+    marineSnow('rgba(255,255,230,.4)',.35);
+    var ly=L.layers||0, gr=L.grow||0;
+    for(var j=0;j<ly;j++){
+      var yy=H-52-j*12, rx=96-j*3.6, bump=(j===ly-1)?gr*4:0;
+      cx.fillStyle=j%2?'#8a6a4b':'#b99a6b'; cx.beginPath(); cx.ellipse(400,yy,rx,22+bump,0,Math.PI,TAU); cx.lineTo(400+rx,yy+12); cx.lineTo(400-rx,yy+12); cx.fill();
+      cx.strokeStyle='#3fa88f'; cx.lineWidth=2.4; cx.beginPath(); cx.ellipse(400,yy,rx,22+bump,0,Math.PI*1.04,Math.PI*1.96); cx.stroke();
+    }
+    var top=H-62-ly*12;
+    cx.fillStyle='#2e9c82'; cx.beginPath(); cx.ellipse(400,top+6,92-ly*3.4,8,0,0,TAU); cx.fill();
+    if(G.mode==='play'&&L.carry>0&&ly<10){
+      cx.strokeStyle='rgba(242,193,78,'+(.5+Math.sin(G.clock*6)*.3)+')'; cx.lineWidth=2.5; cx.setLineDash([8,6]);
+      cx.beginPath(); cx.ellipse(400,top-6,104,42,0,0,TAU); cx.stroke(); cx.setLineDash([]);
+    }
+  },
+  quests:function(){return [{t:'스트로마톨라이트 쌓기 '+(L.layers||0)+'/10층',d:(L.layers||0)>=10},{t:'알갱이를 모아 가운데 돌무더기에 닿기 (들고 있는 알갱이 '+(L.carry||0)+'/5)',d:false}];},
+  done:function(){return L.layers>=10;}
+});
+
+var FR=[{p:10,k:'medusoid',n:'메두소이드형 생물'},{p:28,k:'charnia',n:'차르니아'},{p:46,k:'dick',n:'디킨소니아'},{p:64,k:'tribra',n:'트리브라키디움'},{p:82,k:'spriggina',n:'스프리기나'}];
+S.push({
+  name:'산호 숲과 첫 생물들', era:'약 5억 7천만 년 전 · 에디아카라기', gaugeLabel:'산소',
+  story:'산소가 늘어난 바다에 낯선 생물들이 하나둘 나타납니다. 산호 숲을 헤치고 앞으로 나아가며 가시 괴물을 피하세요. 진행도가 100%가 되면 다음 바다로 이어집니다.',
+  fact:'에디아카라기에는 차르니아, 디킨소니아 같은 몸이 부드러운 대형 생물이 나타났습니다. 이 게임의 산호 숲은 분위기를 위한 배경이고, 진짜 산호는 이보다 나중에 등장했습니다.',
+  init:function(){L={prog:0,scroll:0,found:0,idx:0,spE:1.5,spB:1}; G.gauge=90; G.kills=0;},
+  update:function(dt){
+    L.prog=Math.min(100,L.prog+dt*2.3); L.scroll+=dt*110;
+    G.gauge=Math.max(0,G.gauge-2*dt); if(G.gauge<=0) starve(dt);
+    L.spE-=dt; if(L.spE<=0){L.spE=rnd(1.4,2.3);
+      if(Math.random()<.3) addEnemy({type:'sulfur',vx:-rnd(90,120),a:rnd(30,60),f:rnd(1.5,3)});
+      else addEnemy({type:'urchin',vx:-rnd(100,140),y:rnd(60,H-70),r:17,hp:3,a:40,f:1.6,score:20});}
+    L.spB-=dt; if(L.spB<=0){L.spB=rnd(1.5,2.4); addItem('o2',W+10,rnd(60,H-70),-rnd(100,130),rnd(-15,15));}
+    if(L.idx<FR.length&&L.prog>=FR[L.idx].p){
+      var f=FR[L.idx++], o={k:f.k,x:W+60,y:rnd(90,260),vx:-70,t:0};
+      if(f.k==='charnia'||f.k==='dick'){o.y=H-26; o.vx=-110;}
+      if(f.k==='tribra') o.vx=-50; if(f.k==='spriggina') o.vx=-85;
+      friends.push(o); L.found++; toast('새 생물 출현: '+f.n);
+    }
+  },
+  bg:function(){
+    grad('#0b6a94','#06284a'); shafts(.07);
+    cx.fillStyle='#2b4a5c'; cx.fillRect(0,H-26,W,26);
+    drawCorals(L.scroll||G.clock*60); marineSnow('rgba(200,240,255,.4)',.2);
+  },
+  quests:function(){return [{t:'산호 숲 통과 '+Math.floor(L.prog||0)+'%',d:(L.prog||0)>=100},{t:'새로운 생물 만나기 '+(L.found||0)+'/5',d:(L.found||0)>=5}];},
+  done:function(){return L.prog>=100;}
+});
+
+S.push({
+  name:'눈덩이 지구', era:'약 7억 2천만~6억 3천만 년 전 · 크라이오제니아기', gaugeLabel:'체온',
+  story:'바다가 얼어붙으면서 많은 생물이 사라지고 있습니다. 위에서 떨어지는 얼음 조각을 쏘아 부수거나 피하고, 바닥에서 올라오는 따뜻한 열수 방울로 체온을 지키며 36초를 버티세요.',
+  fact:'크라이오제니아기에는 지구 대부분이 얼음에 덮였던 눈덩이 지구 시기가 있었고, 이때 많은 생물이 줄어든 것으로 추정됩니다. 열수구 주변과 얼음 틈의 물에서 살아남은 생물이 이후 다시 번성했습니다.',
+  init:function(){L={t:0,pop:100,spI:1,spH:1.5}; G.gauge=100; G.kills=0;},
+  update:function(dt){
+    L.t+=dt; L.pop=clamp(100-88*Math.pow(L.t/36,.8),12,100);
+    G.gauge=Math.max(0,G.gauge-5*dt); if(G.gauge<=0) starve(dt);
+    L.spI-=dt; if(L.spI<=0){L.spI=Math.max(.35,1.1-L.t*.02);
+      addEnemy({type:'ice',x:rnd(40,W-40),y:-30,vx:rnd(-40,40),vy:rnd(150,230),r:9,hp:1,score:5});}
+    L.spH-=dt; if(L.spH<=0){L.spH=rnd(2.6,3.6); addItem('heat',rnd(80,W-80),H+10,0,-70);}
+  },
+  bg:function(){
+    grad('#1d3a52','#5f8fa8');
+    var a=(L.pop==null?100:L.pop)/100*.45;
+    drawFrond(150,H-30,110,G.clock,'#b9d8e8',a); drawFrond(560,H-30,90,G.clock+2,'#b9d8e8',a);
+    drawDickinsonia(330,H-34,44,15,G.clock,'#cfe6f0','#7fa9be',a); cx.globalAlpha=a; drawMedusoid(690,170,G.clock,1.3);
+    cx.globalAlpha=1;
+    cx.fillStyle='#e9f6fb'; cx.beginPath(); cx.moveTo(0,0);
+    for(var i=0;i<ICE.length;i++) cx.lineTo(i*W/16,ICE[i]); cx.lineTo(W,0); cx.fill();
+    cx.fillStyle='#d4ecf6'; cx.beginPath(); cx.moveTo(0,H);
+    for(i=0;i<ICE.length;i++) cx.lineTo(i*W/16,H-ICE[(i+5)%ICE.length]*.55); cx.lineTo(W,H); cx.fill();
+    marineSnow('rgba(255,255,255,.75)',1.6);
+    var low=G.mode==='play'?clamp((35-G.gauge)/35,0,1):0; vignette(.2+low*.6);
+    cx.font='16px "Do Hyeon","Malgun Gothic",sans-serif'; cx.textAlign='right'; cx.fillStyle='#fff';
+    cx.fillText('살아있는 생물 '+Math.round(L.pop==null?100:L.pop)+'%',W-16,H-14); cx.textAlign='left';
+  },
+  quests:function(){return [{t:'얼음 시대 버티기 '+Math.min(36,Math.floor(L.t||0))+'/36초',d:(L.t||0)>=36},{t:'체온 지키기: 열수 방울을 모으기',d:false}];},
+  done:function(){return L.t>=36;}
+});
+
+S.push({
+  name:'에디아카라 보스전', era:'약 5억 6천만 년 전 · 에디아카라기', gaugeLabel:null,
+  story:'킴베렐라 공주는 거대한 디킨소니아의 거품 감옥에 갇혀 있습니다. 보스의 포자를 피하며 빛을 쏘세요. 체력이 줄어들면 차르니아 덩굴이 솟고, 트리브라키디움이 소환됩니다.',
+  fact:'디킨소니아, 차르니아, 킴베렐라는 모두 에디아카라 생물군에 속합니다. 이 생물군은 딱딱한 뼈나 껍데기가 없는 몸 때문에 화석으로 남는 흔적이 독특합니다.',
+  init:function(){
+    L={boss:{x:610,y:225,rx:76,ry:50,r:52,hp:45,max:45,t:0,flash:0,dead:false},atk:1.8,frondT:3,triT:5,fronds:[],win:0,pr:{x:735,y:92,free:false}};
+    G.gauge=100; G.kills=0; P.xmax=520;
+  },
+  update:function(dt){
+    var b=L.boss;
+    if(!b.dead){
+      b.t+=dt; b.flash=Math.max(0,b.flash-dt);
+      b.y=225+Math.sin(b.t*(b.hp<=15?1.5:.9))*100; b.x=610+Math.sin(b.t*.6)*22;
+      L.atk-=dt; if(L.atk<=0){
+        L.atk=b.hp<=15?1.1:1.6; var a=Math.atan2(P.y-b.y,P.x-b.x);
+        [-.28,0,.28].forEach(function(d){eb.push({x:b.x-55,y:b.y,vx:Math.cos(a+d)*200,vy:Math.sin(a+d)*200,r:7});});
+      }
+      if(b.hp<=30){L.frondT-=dt; if(L.frondT<=0){L.frondT=2.6; L.fronds.push({x:rnd(150,500),t:0}); toast('차르니아 덩굴이 솟는다!');}}
+      if(b.hp<=15){L.triT-=dt; if(L.triT<=0&&enemies.length<3){L.triT=4.2; addEnemy({type:'tribra',x:W+20,y:rnd(80,H-80),vx:-90,r:20,hp:3,a:50,f:1.4,score:30,shoot:1.2});}}
+      for(var i=bullets.length-1;i>=0;i--){
+        var bu=bullets[i], dx=(bu.x-b.x)/b.rx, dy=(bu.y-b.y)/b.ry;
+        if(dx*dx+dy*dy<1){b.hp--; b.flash=.12; bullets.splice(i,1); burst(bu.x,bu.y,'#ffcb85',6,100); G.score+=2;}
+      }
+      if(b.hp<=0){b.hp=0; b.dead=true; enemies=[]; eb=[]; L.fronds=[]; burst(b.x,b.y,'#ffcb85',60,260); burst(b.x,b.y,'#fff',30,200); G.shake=.6; toast('보스 격파! 공주의 거품이 터진다');}
+    } else {
+      L.win+=dt; L.pr.free=true;
+      L.pr.x+=(P.x+46-L.pr.x)*Math.min(1,dt*1.4); L.pr.y+=(P.y-L.pr.y)*Math.min(1,dt*1.4);
+      if(Math.random()<.2) parts.push({x:L.pr.x,y:L.pr.y-20,vx:rnd(-20,20),vy:-rnd(30,60),life:1,max:1,c:'#ff7a90',r:3});
+    }
+    for(var f=L.fronds.length-1;f>=0;f--){
+      var fr=L.fronds[f]; fr.t+=dt;
+      fr.h=fr.t<.9?0:fr.t<1.6?170*(fr.t-.9)/.7:fr.t<3?170:170*(1-(fr.t-3)/.6);
+      if(fr.t>3.6){L.fronds.splice(f,1); continue;}
+      if(fr.h>30&&Math.abs(P.x-fr.x)<P.r+16&&P.y>H-30-fr.h) hurt(1);
+    }
+  },
+  bg:function(){
+    grad('#241046','#0a1a38'); shafts(.04);
+    for(var i=0;i<8;i++) drawFrond(60+i*105,H-18,90+(i%3)*30,G.clock+i,'#a56bd6',.45);
+    cx.fillStyle='#1c1740'; cx.fillRect(0,H-20,W,20); marineSnow('rgba(220,190,255,.35)',.2);
+  },
+  fg:function(){
+    var b=L.boss||{}, i;
+    drawPrincess(L.pr.x,L.pr.y,G.clock,!L.pr.free,1);
+    if(!b.dead){
+      drawDickinsonia(b.x,b.y,b.rx,b.ry,b.t,'#c9783a','#ffcb85');
+      cx.fillStyle='#fff'; cx.beginPath(); cx.arc(b.x-b.rx*.62,b.y-15,7,0,TAU); cx.arc(b.x-b.rx*.62,b.y+15,7,0,TAU); cx.fill();
+      cx.fillStyle='#d11'; cx.beginPath(); cx.arc(b.x-b.rx*.62-2,b.y-15,3.5,0,TAU); cx.arc(b.x-b.rx*.62-2,b.y+15,3.5,0,TAU); cx.fill();
+      if(b.flash>0){cx.fillStyle='rgba(255,255,255,.5)'; cx.beginPath(); cx.ellipse(b.x,b.y,b.rx,b.ry,0,0,TAU); cx.fill();}
+      cx.fillStyle='rgba(0,0,0,.5)'; cx.fillRect(W/2-151,12,302,14);
+      cx.fillStyle='#ff8a3a'; cx.fillRect(W/2-150,13,300*b.hp/b.max,12);
+      cx.font='14px "Do Hyeon","Malgun Gothic",sans-serif'; cx.fillStyle='#fff'; cx.textAlign='center'; cx.fillText('디킨소니아',W/2,42); cx.textAlign='left';
+    }
+    for(i=0;i<(L.fronds||[]).length;i++){
+      var fr=L.fronds[i];
+      if(fr.t<.9){cx.fillStyle='rgba(255,120,200,'+(.25+Math.sin(G.clock*14)*.15)+')'; cx.beginPath(); cx.ellipse(fr.x,H-18,26,7,0,0,TAU); cx.fill();}
+      else drawFrond(fr.x,H-20,fr.h,G.clock,'#ff8ad8',1);
+    }
+  },
+  quests:function(){var b=L.boss||{hp:45}; return [{t:'디킨소니아 쓰러뜨리기 (체력 '+b.hp+'/45)',d:!!b.dead},{t:'킴베렐라 공주 구출하기',d:!!b.dead}];},
+  done:function(){return L.win>3;}
+});
+
+/* ---------- 갱신 ---------- */
+function inputVec(){
+  var ix=0,iy=0;
+  if(keys.arrowleft||keys.a) ix-=1; if(keys.arrowright||keys.d) ix+=1;
+  if(keys.arrowup||keys.w) iy-=1; if(keys.arrowdown||keys.s) iy+=1;
+  if(pointer){var dx=pointer.x-P.x, dy=pointer.y-P.y, m=Math.max(Math.hypot(dx,dy),60); ix=dx/m; iy=dy/m;}
+  var n=Math.hypot(ix,iy); if(n>1){ix/=n; iy/=n;}
+  return {x:ix,y:iy};
+}
+function updPlayer(dt){
+  var v=inputVec(), k=Math.min(1,dt*7);
+  P.vx+=(v.x*250-P.vx)*k; P.vy+=(v.y*250-P.vy)*k;
+  P.x=clamp(P.x+P.vx*dt,22,P.xmax); P.y=clamp(P.y+P.vy*dt,24,H-24);
+  P.inv=Math.max(0,P.inv-dt); P.cd-=dt;
+  if(firing()&&P.cd<=0){P.cd=.2; bullets.push({x:P.x+16,y:P.y,vx:560,r:5});}
+}
+function killEnemy(e){
+  var i=enemies.indexOf(e); if(i>=0) enemies.splice(i,1);
+  burst(e.x,e.y,e.type==='ice'?'#cfeaf5':'#e6e06a',12,150); G.kills++; G.score+=e.score;
+  if(G.stage<3&&Math.random()<.25) addItem('o2',e.x,e.y,0,-50);
+}
+function updEnemy(e,dt){
+  e.t+=dt;
+  if(e.type==='sulfur'||e.type==='urchin'){e.x+=e.vx*dt; e.y=e.y0+Math.sin(e.t*e.f)*e.a;}
+  else if(e.type==='virus'){e.x+=e.vx*dt; e.y+=clamp(P.y-e.y,-60,60)*dt*1.2;}
+  else if(e.type==='ice'){e.x+=e.vx*dt; e.y+=e.vy*dt; e.rot+=dt*2;}
+  else if(e.type==='tribra'){
+    if(e.x>640) e.x+=e.vx*dt; e.y=e.y0+Math.sin(e.t*e.f)*e.a;
+    e.shoot-=dt; if(e.shoot<=0&&e.x<=700){e.shoot=1.7; for(var i=0;i<3;i++){var a=e.t*2+i*TAU/3; eb.push({x:e.x,y:e.y,vx:Math.cos(a)*150,vy:Math.sin(a)*150,r:6});}}
+  }
+}
+function step(dt){
+  updPlayer(dt);
+  var st=S[G.stage]; st.update(dt);
+  if(G.mode!=='play') return;
+  var i,j;
+  for(i=bullets.length-1;i>=0;i--){bullets[i].x+=bullets[i].vx*dt; if(bullets[i].x>W+20) bullets.splice(i,1);}
+  for(i=enemies.length-1;i>=0;i--){
+    var e=enemies[i]; updEnemy(e,dt);
+    if(e.x<-90||e.x>W+160||e.y>H+90){enemies.splice(i,1); continue;}
+    for(j=bullets.length-1;j>=0;j--){
+      if(hit(bullets[j],e)){bullets.splice(j,1); e.hp--; burst(e.x,e.y,'#f2c14e',4,90); if(e.hp<=0){killEnemy(e); e=null; break;}}
+    }
+    if(e&&hit(P,e,-4)){hurt(1); if(e.type!=='tribra') killEnemy(e);}
+  }
+  for(i=eb.length-1;i>=0;i--){
+    var s=eb[i]; s.x+=s.vx*dt; s.y+=s.vy*dt;
+    if(s.x<-20||s.x>W+20||s.y<-20||s.y>H+20){eb.splice(i,1); continue;}
+    if(hit(P,s,-2)){eb.splice(i,1); hurt(1);}
+  }
+  for(i=items.length-1;i>=0;i--){
+    var it=items[i]; it.t+=dt; it.x+=it.vx*dt+Math.sin(it.t*3)*.4; it.y+=it.vy*dt;
+    if((it.y<-30&&it.vy<0)||(it.y>H+40&&it.vy>0)||it.x<-40||it.x>W+60){items.splice(i,1); continue;}
+    if(hit(P,it,6)){
+      if(it.type==='o2'){G.gauge=Math.min(100,G.gauge+18); L.bub=(L.bub||0)+1; burst(it.x,it.y,'#9fe8ff',8,90);}
+      else if(it.type==='heat'){G.gauge=Math.min(100,G.gauge+28); burst(it.x,it.y,'#ffb36b',10,100);}
+      else {L.carry=Math.min(5,(L.carry||0)+1); burst(it.x,it.y,'#e8d59a',6,80);}
+      items.splice(i,1);
+    }
+  }
+  for(i=friends.length-1;i>=0;i--){var f=friends[i]; f.t+=dt; f.x+=f.vx*dt; if(f.x<-120) friends.splice(i,1);}
+  if(G.mode==='play'&&st.done()) stageClear();
+}
+function updFx(dt){
+  G.shake=Math.max(0,G.shake-dt);
+  for(var i=parts.length-1;i>=0;i--){var p=parts[i]; p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=.97; p.vy*=.97; if(p.life<=0) parts.splice(i,1);}
+  for(i=toasts.length-1;i>=0;i--){toasts[i].life-=dt; if(toasts[i].life<=0) toasts.splice(i,1);}
+}
+
+/* ---------- 그리기 ---------- */
+function drawFriend(f){
+  if(f.k==='medusoid') drawMedusoid(f.x,f.y+Math.sin(f.t*2)*8,f.t,1.5);
+  else if(f.k==='charnia') drawFrond(f.x,f.y,120,f.t,'#d86bd0',.9);
+  else if(f.k==='dick') drawDickinsonia(f.x,f.y-6,46,16,f.t,'#d08a4a','#ffd29a');
+  else if(f.k==='tribra') drawTribra(f.x,f.y+Math.sin(f.t)*10,20,f.t);
+  else drawSpriggina(f.x,f.y+Math.sin(f.t*2)*14,f.t,1.4);
+}
+function drawItem(it){
+  cx.save(); cx.translate(it.x,it.y);
+  if(it.type==='o2'){
+    cx.strokeStyle='rgba(190,240,255,.95)'; cx.fillStyle='rgba(120,210,255,.28)'; cx.lineWidth=2;
+    cx.beginPath(); cx.arc(0,0,it.r+1,0,TAU); cx.fill(); cx.stroke();
+    cx.fillStyle='#e8fbff'; cx.font='9px "Do Hyeon",sans-serif'; cx.textAlign='center'; cx.fillText('O₂',0,3);
+    cx.fillStyle='rgba(255,255,255,.8)'; cx.beginPath(); cx.arc(-3,-4,2,0,TAU); cx.fill();
+  } else if(it.type==='grain'){
+    cx.rotate(it.t); cx.fillStyle='#e8d59a'; cx.strokeStyle='#8a6a4b'; cx.lineWidth=1.5; pathPoly([[0,-9],[8,0],[0,9],[-8,0]]); cx.fill(); cx.stroke();
+  } else {
+    var g=cx.createRadialGradient(0,0,2,0,0,16); g.addColorStop(0,'rgba(255,230,160,1)'); g.addColorStop(1,'rgba(255,110,60,0)');
+    cx.fillStyle=g; cx.beginPath(); cx.arc(0,0,16,0,TAU); cx.fill();
+    cx.fillStyle='#ff8a3a'; cx.beginPath(); cx.arc(0,0,6,0,TAU); cx.fill();
+  }
+  cx.restore();
+}
+function drawEnemy(e){
+  if(e.type==='sulfur') drawSulfur(e); else if(e.type==='virus') drawVirus(e); else if(e.type==='urchin') drawUrchin(e);
+  else if(e.type==='ice') drawIce(e); else if(e.type==='tribra') drawTribra(e.x,e.y,e.r,e.t);
+}
+function draw(){
+  var i;
+  cx.save();
+  if(G.shake>0) cx.translate(rnd(-1,1)*G.shake*14,rnd(-1,1)*G.shake*14);
+  var st=S[G.stage]; st.bg(); if(st.fg) st.fg();
+  for(i=0;i<friends.length;i++) drawFriend(friends[i]);
+  for(i=0;i<items.length;i++) drawItem(items[i]);
+  for(i=0;i<enemies.length;i++) drawEnemy(enemies[i]);
+  cx.fillStyle='#c78bff';
+  for(i=0;i<eb.length;i++){cx.beginPath(); cx.arc(eb[i].x,eb[i].y,eb[i].r,0,TAU); cx.fill(); cx.strokeStyle='#f0d8ff'; cx.lineWidth=1.5; cx.stroke();}
+  for(i=0;i<bullets.length;i++){var b=bullets[i]; cx.fillStyle='rgba(242,193,78,.35)'; cx.fillRect(b.x-22,b.y-2,22,4); cx.fillStyle='#ffe28a'; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();}
+  if(G.mode==='title'||G.mode==='intro'){
+    drawPrince(190,225+Math.sin(G.clock*2)*8,G.clock,0,G.mode==='title'?1.6:1);
+    if(G.mode==='title') drawPrincess(700,200,G.clock,true,1.3);
+  } else if(G.mode!=='over'){
+    drawPrince(P.x,P.y,G.clock,P.inv,1);
+    if(G.stage===1&&L.carry>0){cx.fillStyle='#e8d59a'; for(i=0;i<L.carry;i++){cx.beginPath(); cx.arc(P.x-30-i*7,P.y+16,3,0,TAU); cx.fill();}}
+  }
+  for(i=0;i<parts.length;i++){var p=parts[i]; cx.globalAlpha=Math.max(0,p.life/p.max); cx.fillStyle=p.c; cx.beginPath(); cx.arc(p.x,p.y,p.r,0,TAU); cx.fill();}
+  cx.globalAlpha=1;
+  cx.font='18px "Do Hyeon","Malgun Gothic",sans-serif'; cx.textAlign='center';
+  for(i=0;i<toasts.length;i++){var t=toasts[i]; cx.globalAlpha=Math.min(1,t.life*1.5); cx.fillStyle='rgba(2,20,28,.7)'; var tw=cx.measureText(t.t).width+28; cx.fillRect(W/2-tw/2,64+i*30,tw,26); cx.fillStyle='#ffe28a'; cx.fillText(t.t,W/2,83+i*30);}
+  cx.globalAlpha=1; cx.textAlign='left';
+  var gl=S[G.stage].gaugeLabel;
+  if(G.mode==='play'&&gl&&G.gauge<25&&Math.floor(G.clock*4)%2===0){cx.fillStyle='#ff7a90'; cx.font='20px "Do Hyeon","Malgun Gothic",sans-serif'; cx.textAlign='center'; cx.fillText(gl+' 부족! 방울을 모으세요',W/2,H-20); cx.textAlign='left';}
+  cx.restore();
+}
+
+/* ---------- HUD와 오버레이 ---------- */
+var ov=$('ov'), box=$('stageBox'), lastHp=-1, lastQ='';
+function hud(){
+  if(G.hp!==lastHp){lastHp=G.hp; var h=''; for(var i=0;i<5;i++) h+=drawHeart(i<G.hp); $('hearts').innerHTML=h;}
+  var st=S[G.stage], gl=G.mode==='title'?null:st.gaugeLabel;
+  $('gaugeWrap').style.visibility=gl?'visible':'hidden';
+  if(gl){
+    $('gaugeLabel').textContent=gl; var f=$('gaugeFill'); f.style.width=clamp(G.gauge,0,100)+'%';
+    f.style.background=G.gauge<=30?'#ff7a90':(G.stage===3?'#7fd4f5':'#3fd1b0');
+  }
+  $('stageChip').textContent=G.mode==='title'?'준비':'STAGE '+(G.stage+1)+' / 5';
+  var q=G.mode==='title'?[]:st.quests(), s='';
+  for(var k=0;k<q.length;k++) s+='<li'+(q[k].d?' class="done"':'')+'>'+q[k].t+'</li>';
+  if(s!==lastQ){lastQ=s; $('questList').innerHTML=s||'<li>모험을 시작하면 퀘스트가 표시됩니다</li>';}
+}
+function showOv(html,label,fn){
+  ov.innerHTML='<div class="card">'+html+'<button class="btn" id="ovBtn" type="button">'+label+'</button></div>';
+  ov.hidden=false; box.classList.add('ovon');
+  var b=$('ovBtn'); b.addEventListener('click',fn); b.focus({preventScroll:true});
+}
+function hideOv(){ov.hidden=true; box.classList.remove('ovon');}
+function startPlay(){hideOv(); G.mode='play';}
+function showTitle(){
+  G.mode='title'; G.stage=0; L={}; resetWorld();
+  showOv('<div class="tag">남세균 왕자의 모험</div><h2>선캄브리아 퀘스트</h2>'+
+    '<p>킴베렐라 공주가 에디아카라 바다의 거대한 보스에게 붙잡혔습니다. 남세균 왕자가 되어 광합성 빛으로 괴물을 물리치고, 다섯 단계의 바다를 지나 공주를 구하세요.</p>'+
+    '<ul><li>1단계 산소가 없는 바다</li><li>2단계 스트로마톨라이트의 층</li><li>3단계 산호 숲과 첫 생물들</li><li>4단계 눈덩이 지구</li><li>5단계 에디아카라 보스전</li></ul>','모험 시작',function(){startStage(0,false);});
+}
+function startStage(i,skip){
+  G.stage=i; G.hp=5; G.score=G.score||0; resetWorld(); S[i].init(); lastHp=-1; lastQ='';
+  if(skip){startPlay(); return;}
+  G.mode='intro';
+  showOv('<div class="tag">STAGE '+(i+1)+' / 5 · '+S[i].era+'</div><h2>'+S[i].name+'</h2><p>'+S[i].story+'</p>','출발',startPlay);
+}
+function stageClear(){
+  G.mode='clear'; var i=G.stage, last=i===S.length-1;
+  burst(P.x,P.y,'#3fd1b0',30,200);
+  setTimeout(function(){
+    if(G.mode!=='clear') return;
+    showOv('<div class="tag">STAGE '+(i+1)+' 클리어</div><h2>'+(last?'공주를 구했다!':S[i].name+' 통과')+'</h2><p class="fact">'+S[i].fact+'</p>',last?'엔딩 보기':'다음 단계',function(){last?showEnd():startStage(i+1,false);});
+  },900);
+}
+function gameOver(){
+  G.mode='over'; burst(P.x,P.y,'#3fd1b0',30,200);
+  setTimeout(function(){
+    if(G.mode!=='over') return;
+    showOv('<div class="tag">STAGE '+(G.stage+1)+'</div><h2>쓰러졌다</h2><p>왕자의 몸이 바다에 흩어졌습니다. 같은 단계를 다시 도전할 수 있습니다.</p>','다시 도전',function(){startStage(G.stage,true);});
+  },700);
+}
+function showEnd(){
+  G.mode='end';
+  showOv('<div class="tag">ENDING</div><h2>왕자와 공주가 다시 만났다</h2>'+
+    '<p>남세균이 만든 산소가 바다를 바꾸었고, 그 바다에서 에디아카라 생물들이 번성했습니다. 왕자와 킴베렐라 공주는 산호 숲 사이를 함께 헤엄쳐 갔습니다.</p>'+
+    '<ul><li>약 35억 년 전: 가장 오래된 스트로마톨라이트 화석</li><li>약 27억~24억 년 전: 남세균의 광합성으로 산소가 늘기 시작</li><li>약 7억 2천만~6억 3천만 년 전: 눈덩이 지구</li><li>약 6억 3천만~5억 4천만 년 전: 에디아카라 생물군</li></ul>'+
+    '<p class="fact">킴베렐라는 연체동물과 비슷한 몸을 가졌던 것으로 추정되는 에디아카라기 생물입니다. 점수: '+G.score+'</p>','처음부터 다시',function(){G.score=0; showTitle();});
+}
+
+/* ---------- 메인 루프 ---------- */
+var last=performance.now();
+function frame(now){
+  var dt=Math.min(.05,(now-last)/1000); last=now; G.clock+=dt;
+  if(G.mode==='play') step(dt);
+  updFx(dt); draw(); hud();
+  requestAnimationFrame(frame);
+}
+showTitle();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
